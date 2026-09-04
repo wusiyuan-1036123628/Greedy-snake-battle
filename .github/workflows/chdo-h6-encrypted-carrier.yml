@@ -1,0 +1,50 @@
+name: CHDO H6 encrypted public carrier — DO NOT MERGE
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/chdo-h6-encrypted-carrier.yml'
+      - 'chdo-h6-carrier/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chdo-h6-encrypted-carrier-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  frozen-run:
+    if: github.head_ref == 'chdo/h6-encrypted-carrier-v0.1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CHDO_CARRIER_KEY_B64: ${{ secrets.CHDO_CARRIER_KEY_B64 }}
+    steps:
+      - name: Checkout encrypted carrier branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Verify secret availability without disclosure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CHDO_CARRIER_KEY_B64"
+          echo 'CARRIER_SECRET_PRESENT=true'
+
+      - name: Decrypt, verify and execute exact frozen carrier
+        id: execute
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x chdo-h6-carrier/run_encrypted_carrier.sh
+          chdo-h6-carrier/run_encrypted_carrier.sh
+
+      - name: Upload encrypted execution artifact only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: CHDO-P0-08-ENCRYPTED-RUN-${{ github.run_id }}
+          path: public-encrypted-output/
+          if-no-files-found: error
+          retention-days: 30
