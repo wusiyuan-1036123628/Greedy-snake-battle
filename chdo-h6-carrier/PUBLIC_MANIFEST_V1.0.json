@@ -4,9 +4,28 @@
   "plaintext_carrier_file": "CHDO_P0_08_Alternative_Execution_Carrier_V1.0.zip",
   "plaintext_sha256": "e2a6049f6e3e30bfd67af99ecc0bdd268ca0584efb6635c95d10a6bc82bbb41c",
   "plaintext_size_bytes": 66728,
-  "ciphertext_file": "CHDO_P0_08_Alternative_Execution_Carrier_V1.0.zip.gpg",
+  "ciphertext_file_runtime": "carrier.zip.gpg",
   "ciphertext_sha256": "5ecfd5acef063e1c6e5772794b8e43842884decdc7b7428183152f3102e316cb",
   "ciphertext_size_bytes": 66850,
+  "ciphertext_transport": {
+    "encoding": "base64-split-ascii",
+    "directory": "payload",
+    "glob": "ciphertext.b64.part-*",
+    "part_count": 10,
+    "concatenated_base64_length": 89136,
+    "parts": [
+      {"name": "ciphertext.b64.part-00", "size_bytes": 9000, "sha256": "3cc3f2d04c1bc4e6f07942be123fa8921ccd230a9b58d76a91d36bed36c7afe6"},
+      {"name": "ciphertext.b64.part-01", "size_bytes": 9000, "sha256": "13de5d5984accf3622244bc0c2f7a140534edb64b1d5fe8fc9f59c30f165b459"},
+      {"name": "ciphertext.b64.part-02", "size_bytes": 9000, "sha256": "ce089381bc2634a192930ed87c6329cd8270d5b6ab3bb544bcb4bd0e51f0b075"},
+      {"name": "ciphertext.b64.part-03", "size_bytes": 9000, "sha256": "8c67719affd0fd2a5bcd90d979c5317ddcdc933de2072967484bf6738c7d1ed7"},
+      {"name": "ciphertext.b64.part-04", "size_bytes": 9000, "sha256": "a4908402256ca65acbfd3db7e95a7e588d54b847f322c798cdd180d15d484a84"},
+      {"name": "ciphertext.b64.part-05", "size_bytes": 9000, "sha256": "9a43f438f6146977694f2bdefde1c6da41c2b87d381b70c00c0dbcd8d1b3963e"},
+      {"name": "ciphertext.b64.part-06", "size_bytes": 9000, "sha256": "68b12d198746705967f7018b930bbbf966bb3277728edd537182d1b8527bf866"},
+      {"name": "ciphertext.b64.part-07", "size_bytes": 9000, "sha256": "49ef7da5b91a3a12dca9522f701ac3206b90d48c5e13911913f8d1ca83ad69c5"},
+      {"name": "ciphertext.b64.part-08", "size_bytes": 9000, "sha256": "baade6e1adcd02ec899603762ca493d70b3906c793074c023a640ab6cfb6a066"},
+      {"name": "ciphertext.b64.part-09", "size_bytes": 8136, "sha256": "246df1884d0c0f18fddfb4851129454f3c727f2a5ec29c2ca2e3d3ea11359358"}
+    ]
+  },
   "cipher": "GnuPG symmetric AES256; iterated+salted S2K SHA512",
   "secret_name": "CHDO_CARRIER_KEY_B64",
   "secret_committed": false,
@@ -14,6 +33,6 @@
   "output_artifact_encrypted_before_upload": true,
   "sealed_analysis_included": false,
   "h6_status": "NOT_TESTED",
-  "activation": "Open same-repository draft PR only after repository secret exists",
+  "activation": "Open same-repository draft PR; public transport verification runs immediately; execution waits until repository secret exists",
   "do_not_merge": true
 }
