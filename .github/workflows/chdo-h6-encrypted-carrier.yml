@@ -1,0 +1,99 @@
+name: CHDO H6 encrypted public carrier — DO NOT MERGE
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/chdo-h6-encrypted-carrier.yml'
+      - 'chdo-h6-carrier/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chdo-h6-encrypted-carrier-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  frozen-run:
+    if: github.head_ref == 'chdo/h6-encrypted-carrier-v0.1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CHDO_CARRIER_KEY_B64: ${{ secrets.CHDO_CARRIER_KEY_B64 }}
+    steps:
+      - name: Checkout encrypted carrier branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Verify public encrypted payload transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('chdo-h6-carrier')
+          manifest = json.loads((root / 'PUBLIC_MANIFEST_V1.0.json').read_text(encoding='utf-8'))
+          transport = manifest['ciphertext_transport']
+          parts = sorted((root / transport['directory']).glob('ciphertext.b64.part-*'))
+          assert len(parts) == transport['part_count']
+          assert [p.name for p in parts] == [row['name'] for row in transport['parts']]
+          chunks = []
+          for part, expected in zip(parts, transport['parts']):
+              raw = part.read_bytes()
+              assert len(raw) == expected['size_bytes']
+              assert hashlib.sha256(raw).hexdigest() == expected['sha256']
+              chunks.append(raw.decode('ascii'))
+          joined = ''.join(chunks)
+          assert len(joined) == transport['concatenated_base64_length']
+          ciphertext = base64.b64decode(joined, validate=True)
+          assert len(ciphertext) == manifest['ciphertext_size_bytes']
+          assert hashlib.sha256(ciphertext).hexdigest() == manifest['ciphertext_sha256']
+          print('PUBLIC_ENCRYPTED_PAYLOAD=PASS')
+          print('PLAINTEXT_PAYLOAD_COMMITTED=false')
+          print('SEALED_ANALYSIS_PRESENT=false')
+          PY
+
+      - name: Check execution secret availability without disclosure
+        id: secret_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${CHDO_CARRIER_KEY_B64:-}" ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'CARRIER_SECRET_PRESENT=true'
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'CARRIER_SECRET_PRESENT=false'
+            echo 'WAITING_USER_ACTION=SET_REPOSITORY_SECRET_CHDO_CARRIER_KEY_B64'
+          fi
+
+      - name: Decrypt, verify and execute exact frozen carrier
+        if: steps.secret_gate.outputs.ready == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x chdo-h6-carrier/run_encrypted_carrier.sh
+          chdo-h6-carrier/run_encrypted_carrier.sh
+
+      - name: Record waiting state when secret is absent
+        if: steps.secret_gate.outputs.ready != 'true'
+        shell: bash
+        run: |
+          echo 'MODEL_EXECUTION=false'
+          echo 'H6=NOT_TESTED'
+          echo 'SEALED_ANALYSIS=LOCKED'
+          echo 'NEXT=SET_REPOSITORY_SECRET_AND_RERUN_JOB'
+
+      - name: Upload encrypted execution artifact only
+        if: always() && steps.secret_gate.outputs.ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: CHDO-P0-08-ENCRYPTED-RUN-${{ github.run_id }}
+          path: public-encrypted-output/
+          if-no-files-found: error
+          retention-days: 30
