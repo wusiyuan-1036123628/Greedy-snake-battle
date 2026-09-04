@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$ROOT/../.." && pwd)
-CIPHER="$ROOT/CHDO_P0_08_Alternative_Execution_Carrier_V1.0.zip.gpg"
+PAYLOAD_DIR="$ROOT/payload"
 MANIFEST="$ROOT/PUBLIC_MANIFEST_V1.0.json"
 WORK="$RUNNER_TEMP/chdo-h6-encrypted-carrier"
+CIPHER="$WORK/carrier.zip.gpg"
 PLAIN="$WORK/carrier.zip"
 UNPACK="$WORK/unpacked"
 PUBLIC_OUT="$REPO_ROOT/public-encrypted-output"
@@ -13,31 +15,62 @@ PUBLIC_OUT="$REPO_ROOT/public-encrypted-output"
 rm -rf "$WORK" "$PUBLIC_OUT"
 mkdir -p "$WORK" "$UNPACK" "$PUBLIC_OUT"
 
-python3 - "$CIPHER" "$MANIFEST" <<'PY'
-import hashlib, json, pathlib, sys
-cipher=pathlib.Path(sys.argv[1]); manifest=json.loads(pathlib.Path(sys.argv[2]).read_text())
-h=hashlib.sha256(cipher.read_bytes()).hexdigest()
-assert h == manifest['ciphertext_sha256'], (h, manifest['ciphertext_sha256'])
-print('CIPHERTEXT_SHA256=PASS')
+mapfile -t PARTS < <(find "$PAYLOAD_DIR" -maxdepth 1 -type f -name 'ciphertext.b64.part-*' -print | sort)
+python3 - "$PAYLOAD_DIR" "$CIPHER" "$MANIFEST" "${PARTS[@]}" <<'PY'
+import base64
+import hashlib
+import json
+import pathlib
+import sys
+
+out = pathlib.Path(sys.argv[2])
+manifest = json.loads(pathlib.Path(sys.argv[3]).read_text(encoding="utf-8"))
+parts = [pathlib.Path(p) for p in sys.argv[4:]]
+transport = manifest["ciphertext_transport"]
+
+assert len(parts) == transport["part_count"], (len(parts), transport["part_count"])
+assert [p.name for p in parts] == [row["name"] for row in transport["parts"]]
+chunks = []
+for part, expected in zip(parts, transport["parts"]):
+    raw = part.read_bytes()
+    assert len(raw) == expected["size_bytes"], (part.name, len(raw), expected["size_bytes"])
+    actual_hash = hashlib.sha256(raw).hexdigest()
+    assert actual_hash == expected["sha256"], (part.name, actual_hash, expected["sha256"])
+    chunks.append(raw.decode("ascii"))
+
+joined = "".join(chunks)
+assert len(joined) == transport["concatenated_base64_length"]
+ciphertext = base64.b64decode(joined, validate=True)
+out.write_bytes(ciphertext)
+assert len(ciphertext) == manifest["ciphertext_size_bytes"]
+assert hashlib.sha256(ciphertext).hexdigest() == manifest["ciphertext_sha256"]
+print("PAYLOAD_PARTS=PASS")
+print("CIPHERTEXT_SHA256=PASS")
 PY
 
 printf '%s' "$CHDO_CARRIER_KEY_B64" | gpg --batch --yes --no-symkey-cache \
   --pinentry-mode loopback --passphrase-fd 0 --output "$PLAIN" --decrypt "$CIPHER"
 
 python3 - "$PLAIN" "$MANIFEST" <<'PY'
-import hashlib, json, pathlib, sys
-plain=pathlib.Path(sys.argv[1]); manifest=json.loads(pathlib.Path(sys.argv[2]).read_text())
-h=hashlib.sha256(plain.read_bytes()).hexdigest()
-assert h == manifest['plaintext_sha256'], (h, manifest['plaintext_sha256'])
-print('PLAINTEXT_CARRIER_SHA256=PASS')
+import hashlib
+import json
+import pathlib
+import sys
+
+plain = pathlib.Path(sys.argv[1])
+manifest = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+actual_hash = hashlib.sha256(plain.read_bytes()).hexdigest()
+assert actual_hash == manifest["plaintext_sha256"], (actual_hash, manifest["plaintext_sha256"])
+assert plain.stat().st_size == manifest["plaintext_size_bytes"]
+print("PLAINTEXT_CARRIER_SHA256=PASS")
 PY
 
 unzip -q "$PLAIN" -d "$UNPACK"
 CARRIER="$UNPACK/chdo_alt_carrier_v1"
 test -d "$CARRIER"
 
-# Downloads occur before inference. The frozen child network namespace still
-# blocks all non-loopback traffic during model invocation.
+# Downloads occur before inference. During model invocation, the unchanged
+# carrier enters a child Linux network namespace with loopback only.
 cd "$CARRIER"
 ./scripts/download_pinned_assets.sh
 
@@ -71,8 +104,8 @@ printf '%s' "$CHDO_CARRIER_KEY_B64" | gpg --batch --yes --no-symkey-cache \
   echo "h6_status=NOT_TESTED_UNTIL_INDEPENDENT_8_OF_8_VALID_VERIFICATION"
 } > "$PUBLIC_OUT/PUBLIC_RUN_RECEIPT.txt"
 
-# Remove plaintext carrier/output material before upload-artifact runs.
-rm -rf "$WORK" "$UNPACK" "$PLAIN"
+# Delete plaintext carrier, outputs, logs and model assets before artifact upload.
+rm -rf "$WORK"
 unset CHDO_CARRIER_KEY_B64
 
 echo "ENCRYPTED_OUTPUT_READY=$OUTPUT_CIPHER"
