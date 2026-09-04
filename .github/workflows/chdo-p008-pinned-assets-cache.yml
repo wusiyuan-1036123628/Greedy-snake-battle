@@ -1,0 +1,111 @@
+name: CHDO P0-08 pinned public assets cache
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/chdo-p008-pinned-assets-cache.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  acquire-pinned-assets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Download and verify exact pinned llama.cpp archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          curl -fL --retry 8 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+            'https://github.com/ggml-org/llama.cpp/releases/download/b10766/llama-b10766-bin-ubuntu-x64.tar.gz' \
+            -o assets/llama-b10766-bin-ubuntu-x64.tar.gz
+          echo 'c2e42962c42d08e61b8e9bdfdfb5a6b7e4d9a7f7290df21f9a590119e92b3e9c  assets/llama-b10766-bin-ubuntu-x64.tar.gz' | sha256sum -c -
+
+      - name: Download and verify exact pinned Qwen GGUF
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 8 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+            'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true' \
+            -o assets/qwen2.5-1.5b-instruct-q4_k_m.gguf
+          test "$(stat -c '%s' assets/qwen2.5-1.5b-instruct-q4_k_m.gguf)" = '1117320736'
+          echo '6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e  assets/qwen2.5-1.5b-instruct-q4_k_m.gguf' | sha256sum -c -
+
+      - name: Split model and create integrity receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          split -b 300M -d -a 2 assets/qwen2.5-1.5b-instruct-q4_k_m.gguf assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-
+          sha256sum assets/llama-b10766-bin-ubuntu-x64.tar.gz assets/qwen2.5-1.5b-instruct-q4_k_m.gguf assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-* > assets/SHA256SUMS.txt
+          {
+            echo 'asset_set=CHDO-P0-08-PINNED-PUBLIC-ASSETS-V1'
+            echo 'llama_release=b10766'
+            echo 'llama_sha256=c2e42962c42d08e61b8e9bdfdfb5a6b7e4d9a7f7290df21f9a590119e92b3e9c'
+            echo 'model_repo=Qwen/Qwen2.5-1.5B-Instruct-GGUF'
+            echo 'model_revision=91cad51170dc346986eccefdc2dd33a9da36ead9'
+            echo 'model_file=qwen2.5-1.5b-instruct-q4_k_m.gguf'
+            echo 'model_size_bytes=1117320736'
+            echo 'model_sha256=6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e'
+            echo 'research_payload=NONE'
+            echo 'sealed_analysis=NOT_PRESENT'
+          } > assets/RECEIPT.txt
+          ls -lh assets
+
+      - name: Upload llama.cpp archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-llama-b10766
+          path: assets/llama-b10766-bin-ubuntu-x64.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Qwen model part 00
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-qwen-q4km-part-00
+          path: assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-00
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Qwen model part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-qwen-q4km-part-01
+          path: assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-01
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Qwen model part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-qwen-q4km-part-02
+          path: assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-02
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Qwen model part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-qwen-q4km-part-03
+          path: assets/qwen2.5-1.5b-instruct-q4_k_m.gguf.part-03
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload public integrity receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: chdo-pinned-assets-receipt
+          path: |
+            assets/SHA256SUMS.txt
+            assets/RECEIPT.txt
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
