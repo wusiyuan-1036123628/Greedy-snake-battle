@@ -1,0 +1,25 @@
+name: Actions dispatch diagnostic
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/actions-dispatch-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Confirm runner assignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'DIAGNOSTIC_ONLY=true'
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "runner_os=${RUNNER_OS:-unknown}"
+          uname -a
