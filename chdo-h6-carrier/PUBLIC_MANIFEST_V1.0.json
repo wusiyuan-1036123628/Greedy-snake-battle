@@ -1,0 +1,19 @@
+{
+  "carrier_id": "CHDO-P0-08-ENCRYPTED-PUBLIC-CARRIER-V1.0",
+  "scientific_contract_changed": false,
+  "plaintext_carrier_file": "CHDO_P0_08_Alternative_Execution_Carrier_V1.0.zip",
+  "plaintext_sha256": "e2a6049f6e3e30bfd67af99ecc0bdd268ca0584efb6635c95d10a6bc82bbb41c",
+  "plaintext_size_bytes": 66728,
+  "ciphertext_file": "CHDO_P0_08_Alternative_Execution_Carrier_V1.0.zip.gpg",
+  "ciphertext_sha256": "5ecfd5acef063e1c6e5772794b8e43842884decdc7b7428183152f3102e316cb",
+  "ciphertext_size_bytes": 66850,
+  "cipher": "GnuPG symmetric AES256; iterated+salted S2K SHA512",
+  "secret_name": "CHDO_CARRIER_KEY_B64",
+  "secret_committed": false,
+  "plaintext_payload_committed": false,
+  "output_artifact_encrypted_before_upload": true,
+  "sealed_analysis_included": false,
+  "h6_status": "NOT_TESTED",
+  "activation": "Open same-repository draft PR only after repository secret exists",
+  "do_not_merge": true
+}
