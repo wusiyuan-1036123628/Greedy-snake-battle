@@ -1,0 +1,59 @@
+name: Public planning drawings intake
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bld-public-drawings-intake.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  public-document-intake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Retrieve fixed public URLs and retain byte receipts
+        shell: python
+        run: |
+          import datetime, hashlib, json, pathlib, urllib.request
+          out = pathlib.Path('public_drawings')
+          out.mkdir(exist_ok=True)
+          items = [
+            ('planning_notice_2025.html','https://pnr.sz.gov.cn/xxgk/gggs/content/post_12118686.html','html'),
+            ('planning_2025.pdf','https://pnr.sz.gov.cn/attachment/1/1567/1567461/12118686.pdf','pdf'),
+            ('phase1_2021.jpg','https://www.sz.gov.cn/attachment/0/935/935383/9486055.jpg','jpeg'),
+            ('phase3_2024.pdf','https://pnr.sz.gov.cn/attachment/1/1469/1469118/11447840.pdf','pdf'),
+            ('phase1_notice_2021.html','https://www.sz.gov.cn/cn/xxgk/zfxxgj/tzgg/content/post_9486055.html','html'),
+          ]
+          receipt = {'activity':'public_document_acquisition_only','research_payload':'NONE','model_execution':False,'requests':[]}
+          for filename, url, kind in items:
+              r = {'filename':filename, 'requested_url':url, 'requested_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(), 'expected_kind':kind}
+              try:
+                  req = urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0 (compatible; PublicDocumentReader/1.0)'})
+                  with urllib.request.urlopen(req, timeout=25) as response:
+                      data = response.read(40*1024*1024+1)
+                      if len(data)>40*1024*1024: raise ValueError('Response exceeds bounded 40 MiB limit')
+                      r.update(status=response.status, final_url=response.url, response_headers={k:response.headers.get(k) for k in ['Date','Content-Type','Content-Length','Last-Modified','ETag']})
+                  valid = (kind=='pdf' and data.startswith(b'%PDF-')) or (kind=='jpeg' and data.startswith(b'\xff\xd8\xff')) or (kind=='html' and (b'<html' in data[:4096].lower() or b'<!doctype' in data[:4096].lower()))
+                  r.update(bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),magic_check=bool(valid))
+                  target = filename if valid else filename+'.unexpected-response.bin'
+                  (out/target).write_bytes(data)
+                  r.update(saved_as=target,classification='RETRIEVED_TYPE_CHECKED' if valid else 'RESPONSE_NOT_EXPECTED_TYPE')
+              except Exception as e:
+                  r.update(classification='ACCESS_FAILED',error=str(e),error_type=type(e).__name__)
+              r['completed_at_utc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+              receipt['requests'].append(r)
+              print(filename,r['classification'],r.get('bytes'),r.get('error',''))
+          (out/'RETRIEVAL_RECEIPT.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          (out/'README.txt').write_text('Public-source bytes only. Retrieval time and hashes do not establish historical effective dates, document approval, or user knowledge. Inspect drawing pixels before adopting diagram/table claims.\n',encoding='utf-8')
+
+      - name: Retain public bytes and access receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-planning-drawings-20260905
+          path: public_drawings/
+          retention-days: 1
+          if-no-files-found: error
