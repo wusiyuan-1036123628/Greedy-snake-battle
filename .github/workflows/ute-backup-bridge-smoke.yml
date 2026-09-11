@@ -1,4 +1,4 @@
-name: UTE Backup Bridge Smoke
+name: UTE Backup Encrypted Bridge
 on:
   push:
     paths:
@@ -6,7 +6,18 @@ on:
 permissions:
   contents: read
 jobs:
-  smoke:
+  bridge:
     runs-on: ubuntu-latest
     steps:
-      - run: echo UTE_BACKUP_BRIDGE_OK
+      - name: Download encrypted V1.16 Git bundle
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 'https://assets.macaly-user-data.dev/uuc2d1gmf3b0ai8usobg92oh/q0xtcfz11bjazynommt3wa7l/TyV5auEI4k5_FrEBMDqdU/ute-ai-v1-16-main-bundle-Boycel16.octet-stream' -o ute-ai-v1.16-main.bundle.enc
+          echo 'bd2fe52462b23eca56409db91c42e95c5ae24c5d16bab083cf2838043d42ad56  ute-ai-v1.16-main.bundle.enc' | sha256sum --check --strict
+      - name: Upload encrypted bridge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ute-ai-v1-16-encrypted-bridge
+          path: ute-ai-v1.16-main.bundle.enc
+          retention-days: 1
+          compression-level: 0
