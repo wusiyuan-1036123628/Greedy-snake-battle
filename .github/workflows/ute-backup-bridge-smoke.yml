@@ -1,0 +1,12 @@
+name: UTE Backup Bridge Smoke
+on:
+  push:
+    paths:
+      - .github/workflows/ute-backup-bridge-smoke.yml
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo UTE_BACKUP_BRIDGE_OK
