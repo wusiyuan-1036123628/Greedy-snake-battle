@@ -1,23 +1,31 @@
-name: UTE Backup Encrypted Bridge
+name: UTE Backup Encrypted Vault
 on:
   push:
     paths:
       - .github/workflows/ute-backup-bridge-smoke.yml
 permissions:
-  contents: read
+  contents: write
 jobs:
-  bridge:
+  vault:
     runs-on: ubuntu-latest
     steps:
-      - name: Download encrypted V1.16 Git bundle
+      - name: Checkout encrypted vault branch
+        uses: actions/checkout@v4
+        with:
+          ref: backup/ute-ai-v1.16-encrypted-vault
+          fetch-depth: 0
+      - name: Download and verify encrypted V1.16 Git bundle
         shell: bash
         run: |
-          curl --fail --location --retry 3 'https://assets.macaly-user-data.dev/uuc2d1gmf3b0ai8usobg92oh/q0xtcfz11bjazynommt3wa7l/TyV5auEI4k5_FrEBMDqdU/ute-ai-v1-16-main-bundle-Boycel16.octet-stream' -o ute-ai-v1.16-main.bundle.enc
-          echo 'bd2fe52462b23eca56409db91c42e95c5ae24c5d16bab083cf2838043d42ad56  ute-ai-v1.16-main.bundle.enc' | sha256sum --check --strict
-      - name: Upload encrypted bridge artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ute-ai-v1-16-encrypted-bridge
-          path: ute-ai-v1.16-main.bundle.enc
-          retention-days: 1
-          compression-level: 0
+          mkdir -p UTE_AI_OPPORTUNITY_AGENT_BACKUP/V1.16
+          curl --fail --location --retry 3 'https://assets.macaly-user-data.dev/uuc2d1gmf3b0ai8usobg92oh/q0xtcfz11bjazynommt3wa7l/TyV5auEI4k5_FrEBMDqdU/ute-ai-v1-16-main-bundle-Boycel16.octet-stream' -o UTE_AI_OPPORTUNITY_AGENT_BACKUP/V1.16/UTE_AI_OPPORTUNITY_AGENT_V1.16.main.bundle.enc
+          echo 'bd2fe52462b23eca56409db91c42e95c5ae24c5d16bab083cf2838043d42ad56  UTE_AI_OPPORTUNITY_AGENT_BACKUP/V1.16/UTE_AI_OPPORTUNITY_AGENT_V1.16.main.bundle.enc' | sha256sum --check --strict
+      - name: Commit encrypted GitHub vault object
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add UTE_AI_OPPORTUNITY_AGENT_BACKUP/V1.16/UTE_AI_OPPORTUNITY_AGENT_V1.16.main.bundle.enc
+          git diff --cached --quiet && exit 0
+          git commit -m 'backup: store encrypted UTE AI V1.16 full Git bundle'
+          git push origin HEAD:backup/ute-ai-v1.16-encrypted-vault
